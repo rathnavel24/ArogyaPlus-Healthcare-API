@@ -4,8 +4,13 @@ from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.core.security import get_current_admin
 from app.models.admin import Admin
-from app.schemas.auth import AdminOut, AdminProfileUpdate, LoginRequest, Token
-from app.services.auth_service import authenticate_admin, issue_token_for_admin, update_admin_profile
+from app.schemas.auth import AdminOut, AdminProfileUpdate, LoginRequest, PasswordChange, Token
+from app.services.auth_service import (
+    authenticate_admin,
+    change_admin_password,
+    issue_token_for_admin,
+    update_admin_profile,
+)
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -34,3 +39,13 @@ def update_me(
     current_admin: Admin = Depends(get_current_admin),
 ):
     return update_admin_profile(db, current_admin, payload)
+
+
+@router.post("/change-password")
+def change_password(
+    payload: PasswordChange,
+    db: Session = Depends(get_db),
+    current_admin: Admin = Depends(get_current_admin),
+):
+    change_admin_password(db, current_admin, payload)
+    return {"message": "Password updated successfully."}

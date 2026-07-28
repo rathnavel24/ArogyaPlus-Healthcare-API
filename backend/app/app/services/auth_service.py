@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 
 from app.core.security import create_access_token, hash_password, verify_password
 from app.models.admin import Admin
-from app.schemas.auth import AdminProfileUpdate
+from app.schemas.auth import AdminProfileUpdate, PasswordChange
 
 
 def authenticate_admin(db: Session, username_or_email: str, password: str) -> Admin | None:
@@ -36,6 +36,19 @@ def update_admin_profile(db: Session, admin: Admin, payload: AdminProfileUpdate)
     if payload.email:
         admin.email = payload.email
 
+    db.commit()
+    db.refresh(admin)
+    return admin
+
+
+def change_admin_password(db: Session, admin: Admin, payload: PasswordChange) -> Admin:
+    if not verify_password(payload.current_password, admin.password_hash):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Current password is incorrect.",
+        )
+
+    admin.password_hash = hash_password(payload.new_password)
     db.commit()
     db.refresh(admin)
     return admin
