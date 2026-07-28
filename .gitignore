@@ -8,6 +8,5 @@ __pycache__/
 .venv_check/
 
 .DS_Store
-requirements.txt
 myenv
 config.py
