@@ -28,7 +28,7 @@ def list_tests(
     sort: Literal["price_asc", "price_desc"] | None = None,
     db: Session = Depends(get_db),
 ):
-    query = db.query(Test).filter(Test.is_active.is_(True))
+    query = db.query(Test).filter(Test.is_active.is_(True), Test.status != -1)
     if search:
         query = query.filter(Test.name.ilike(f"%{search}%"))
     if category:
@@ -40,20 +40,20 @@ def list_tests(
 @public_router.get("/{test_id}", response_model=TestOut)
 def get_test(test_id: int, db: Session = Depends(get_db)):
     test = db.get(Test, test_id)
-    if test is None or not test.is_active:
+    if test is None or not test.is_active or test.status == -1:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Test not found.")
     return test
 
 
 @admin_router.get("", response_model=list[TestOut])
 def admin_list_tests(db: Session = Depends(get_db), current_admin: Admin = Depends(get_current_admin)):
-    return db.query(Test).order_by(Test.name.asc()).all()
+    return db.query(Test).filter(Test.status != -1).order_by(Test.name.asc()).all()
 
 
 @admin_router.get("/{test_id}", response_model=TestOut)
 def admin_get_test(test_id: int, db: Session = Depends(get_db), current_admin: Admin = Depends(get_current_admin)):
     test = db.get(Test, test_id)
-    if test is None:
+    if test is None or test.status == -1:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Test not found.")
     return test
 
@@ -75,7 +75,7 @@ def update_test(
     current_admin: Admin = Depends(get_current_admin),
 ):
     test = db.get(Test, test_id)
-    if test is None:
+    if test is None or test.status == -1:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Test not found.")
 
     for field, value in payload.model_dump(exclude_unset=True).items():
@@ -89,8 +89,8 @@ def update_test(
 @admin_router.delete("/{test_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_test(test_id: int, db: Session = Depends(get_db), current_admin: Admin = Depends(get_current_admin)):
     test = db.get(Test, test_id)
-    if test is None:
+    if test is None or test.status == -1:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Test not found.")
-    db.delete(test)
+    test.status = -1
     db.commit()
     return None

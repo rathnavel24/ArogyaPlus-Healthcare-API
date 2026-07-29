@@ -15,7 +15,7 @@ admin_router = APIRouter(prefix="/api/admin/banners", tags=["admin-banners"])
 def list_banners(db: Session = Depends(get_db)):
     return (
         db.query(Banner)
-        .filter(Banner.is_active.is_(True))
+        .filter(Banner.is_active.is_(True), Banner.status != -1)
         .order_by(Banner.display_order.asc(), Banner.id.asc())
         .all()
     )
@@ -23,7 +23,12 @@ def list_banners(db: Session = Depends(get_db)):
 
 @admin_router.get("", response_model=list[BannerOut])
 def admin_list_banners(db: Session = Depends(get_db), current_admin: Admin = Depends(get_current_admin)):
-    return db.query(Banner).order_by(Banner.display_order.asc(), Banner.id.asc()).all()
+    return (
+        db.query(Banner)
+        .filter(Banner.status != -1)
+        .order_by(Banner.display_order.asc(), Banner.id.asc())
+        .all()
+    )
 
 
 @admin_router.post("", response_model=BannerOut, status_code=status.HTTP_201_CREATED)
@@ -45,7 +50,7 @@ def update_banner(
     current_admin: Admin = Depends(get_current_admin),
 ):
     banner = db.get(Banner, banner_id)
-    if banner is None:
+    if banner is None or banner.status == -1:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Banner not found.")
 
     for field, value in payload.model_dump(exclude_unset=True).items():
@@ -59,8 +64,8 @@ def update_banner(
 @admin_router.delete("/{banner_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_banner(banner_id: int, db: Session = Depends(get_db), current_admin: Admin = Depends(get_current_admin)):
     banner = db.get(Banner, banner_id)
-    if banner is None:
+    if banner is None or banner.status == -1:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Banner not found.")
-    db.delete(banner)
+    banner.status = -1
     db.commit()
     return None

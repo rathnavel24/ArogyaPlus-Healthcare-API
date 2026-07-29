@@ -46,5 +46,6 @@ class BookingItem(Base):
     item_name: Mapped[str] = mapped_column(String(150), nullable=False)
     price: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False)
     quantity: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
-
+    status: Mapped[int] = mapped_column(Integer, default=1,comment="1: Active, 2: Inactive, -1: Deleted")  # 1: Active, 2: inactive,-1 deleted
+    
     booking: Mapped["Booking"] = relationship("Booking", back_populates="items")

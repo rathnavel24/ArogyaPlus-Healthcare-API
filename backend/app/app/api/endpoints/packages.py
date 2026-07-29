@@ -38,7 +38,7 @@ def list_packages(
     sort: Literal["price_asc", "price_desc"] | None = None,
     db: Session = Depends(get_db),
 ):
-    query = db.query(Package).filter(Package.is_active.is_(True))
+    query = db.query(Package).filter(Package.is_active.is_(True), Package.status != -1)
     query = _apply_filters(query, search, category)
     query = _apply_sort(query, sort)
     return query.all()
@@ -47,14 +47,14 @@ def list_packages(
 @public_router.get("/{package_id}", response_model=PackageOut)
 def get_package(package_id: int, db: Session = Depends(get_db)):
     package = db.get(Package, package_id)
-    if package is None or not package.is_active:
+    if package is None or not package.is_active or package.status == -1:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Package not found.")
     return package
 
 
 @admin_router.get("", response_model=list[PackageOut])
 def admin_list_packages(db: Session = Depends(get_db), current_admin: Admin = Depends(get_current_admin)):
-    return db.query(Package).order_by(Package.name.asc()).all()
+    return db.query(Package).filter(Package.status != -1).order_by(Package.name.asc()).all()
 
 
 @admin_router.get("/{package_id}", response_model=PackageOut)
@@ -62,7 +62,7 @@ def admin_get_package(
     package_id: int, db: Session = Depends(get_db), current_admin: Admin = Depends(get_current_admin)
 ):
     package = db.get(Package, package_id)
-    if package is None:
+    if package is None or package.status == -1:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Package not found.")
     return package
 
@@ -75,7 +75,7 @@ def create_package(
     package = Package(**data)
 
     if payload.test_ids:
-        package.tests = db.query(Test).filter(Test.id.in_(payload.test_ids)).all()
+        package.tests = db.query(Test).filter(Test.id.in_(payload.test_ids), Test.status != -1).all()
 
     db.add(package)
     db.commit()
@@ -91,7 +91,7 @@ def update_package(
     current_admin: Admin = Depends(get_current_admin),
 ):
     package = db.get(Package, package_id)
-    if package is None:
+    if package is None or package.status == -1:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Package not found.")
 
     update_data = payload.model_dump(exclude_unset=True, exclude={"test_ids"})
@@ -99,7 +99,7 @@ def update_package(
         setattr(package, field, value)
 
     if payload.test_ids is not None:
-        package.tests = db.query(Test).filter(Test.id.in_(payload.test_ids)).all()
+        package.tests = db.query(Test).filter(Test.id.in_(payload.test_ids), Test.status != -1).all()
 
     db.commit()
     db.refresh(package)
@@ -111,9 +111,9 @@ def delete_package(
     package_id: int, db: Session = Depends(get_db), current_admin: Admin = Depends(get_current_admin)
 ):
     package = db.get(Package, package_id)
-    if package is None:
+    if package is None or package.status == -1:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Package not found.")
-    db.delete(package)
+    package.status = -1
     db.commit()
     return None
 
@@ -126,10 +126,10 @@ def set_package_tests(
     current_admin: Admin = Depends(get_current_admin),
 ):
     package = db.get(Package, package_id)
-    if package is None:
+    if package is None or package.status == -1:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Package not found.")
 
-    package.tests = db.query(Test).filter(Test.id.in_(test_ids)).all()
+    package.tests = db.query(Test).filter(Test.id.in_(test_ids), Test.status != -1).all()
     db.commit()
     db.refresh(package)
     return package
@@ -143,7 +143,7 @@ def remove_package_test(
     current_admin: Admin = Depends(get_current_admin),
 ):
     package = db.get(Package, package_id)
-    if package is None:
+    if package is None or package.status == -1:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Package not found.")
 
     package.tests = [t for t in package.tests if t.id != test_id]

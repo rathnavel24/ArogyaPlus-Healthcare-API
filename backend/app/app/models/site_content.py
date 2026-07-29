@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import JSON, DateTime, String, Text, func
+from sqlalchemy import JSON, DateTime, Integer, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base_class import Base
@@ -48,6 +48,8 @@ class SiteContent(Base):
     social_instagram: Mapped[str | None] = mapped_column(String(300), nullable=True)
     social_twitter: Mapped[str | None] = mapped_column(String(300), nullable=True)
     social_linkedin: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    status: Mapped[int] = mapped_column(Integer, default=1,comment="1: Active, 2: Inactive, -1: Deleted")  # 1: Active, 2: inactive,-1 deleted
+    
 
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
