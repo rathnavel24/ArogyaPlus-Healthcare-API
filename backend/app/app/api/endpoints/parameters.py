@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
@@ -6,21 +6,26 @@ from app.core.security import get_current_admin
 from app.models.admin import Admin
 from app.models.parameter import Parameter
 from app.models.test_parameter import TestParameter
+from app.schemas.pagination import PaginatedResponse
 from app.schemas.parameter import ParameterCreate, ParameterOut, ParameterUpdate
+from app.utils import paginate_query
 
 admin_router = APIRouter(prefix="/api/admin/parameters", tags=["admin-parameters"])
 
 
-@admin_router.get("", response_model=list[ParameterOut])
+@admin_router.get("", response_model=PaginatedResponse[ParameterOut])
 def admin_list_parameters(
     search: str | None = None,
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=10, ge=1, le=100),
     db: Session = Depends(get_db),
     current_admin: Admin = Depends(get_current_admin),
 ):
     query = db.query(Parameter).filter(Parameter.status != -1)
     if search:
         query = query.filter(Parameter.name.ilike(f"%{search}%"))
-    return query.order_by(Parameter.name.asc()).all()
+    query = query.order_by(Parameter.name.asc())
+    return paginate_query(query, page, page_size)
 
 
 @admin_router.post("", response_model=ParameterOut, status_code=status.HTTP_201_CREATED)

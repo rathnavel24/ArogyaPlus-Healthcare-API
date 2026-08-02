@@ -1,6 +1,6 @@
 from typing import Literal
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
@@ -10,7 +10,9 @@ from app.models.admin import Admin
 from app.models.parameter import Parameter
 from app.models.test import Test
 from app.models.test_parameter import TestParameter
+from app.schemas.pagination import PaginatedResponse
 from app.schemas.test import TestCreate, TestOut, TestParameterLink, TestParameterReorder, TestUpdate
+from app.utils import paginate_query
 
 public_router = APIRouter(prefix="/api/tests", tags=["tests"])
 admin_router = APIRouter(prefix="/api/admin/tests", tags=["admin-tests"])
@@ -24,11 +26,13 @@ def _apply_sort(query, sort: str | None):
     return query.order_by(Test.name.asc())
 
 
-@public_router.get("", response_model=list[TestOut])
+@public_router.get("", response_model=PaginatedResponse[TestOut])
 def list_tests(
     search: str | None = None,
     category: str | None = None,
     sort: Literal["price_asc", "price_desc"] | None = None,
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=10, ge=1, le=100),
     db: Session = Depends(get_db),
 ):
     query = db.query(Test).filter(Test.is_active.is_(True), Test.status != -1)
@@ -37,7 +41,7 @@ def list_tests(
     if category:
         query = query.filter(Test.category == category)
     query = _apply_sort(query, sort)
-    return query.all()
+    return paginate_query(query, page, page_size)
 
 
 @public_router.get("/{test_id}", response_model=TestOut)
@@ -48,9 +52,15 @@ def get_test(test_id: int, db: Session = Depends(get_db)):
     return test
 
 
-@admin_router.get("", response_model=list[TestOut])
-def admin_list_tests(db: Session = Depends(get_db), current_admin: Admin = Depends(get_current_admin)):
-    return db.query(Test).filter(Test.status != -1).order_by(Test.name.asc()).all()
+@admin_router.get("", response_model=PaginatedResponse[TestOut])
+def admin_list_tests(
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=10, ge=1, le=100),
+    db: Session = Depends(get_db),
+    current_admin: Admin = Depends(get_current_admin),
+):
+    query = db.query(Test).filter(Test.status != -1).order_by(Test.name.asc())
+    return paginate_query(query, page, page_size)
 
 
 @admin_router.get("/{test_id}", response_model=TestOut)

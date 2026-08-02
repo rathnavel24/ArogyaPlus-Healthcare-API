@@ -1,7 +1,7 @@
 from datetime import date
 from typing import Literal
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import ValidationError
 from sqlalchemy.orm import Session, joinedload
 
@@ -12,7 +12,9 @@ from app.models.booking import Booking
 from app.models.package import Package
 from app.models.test import Test
 from app.schemas.booking import BookingCreate, BookingCreatedOut, BookingOut, BookingStatusUpdate
+from app.schemas.pagination import PaginatedResponse
 from app.services.booking_service import create_booking
+from app.utils import get_pagination
 
 public_router = APIRouter(prefix="/api/bookings", tags=["bookings"])
 admin_router = APIRouter(prefix="/api/admin/bookings", tags=["admin-bookings"])
@@ -35,15 +37,17 @@ def submit_booking(payload: BookingCreate, db: Session = Depends(get_db)):
     )
 
 
-@admin_router.get("", response_model=list[BookingOut])
+@admin_router.get("", response_model=PaginatedResponse[BookingOut])
 def admin_list_bookings(
     status_filter: Literal["New", "Contacted", "Done"] | None = None,
     booking_date: date | None = None,
     search: str | None = None,
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=10, ge=1, le=100),
     db: Session = Depends(get_db),
     current_admin: Admin = Depends(get_current_admin),
 ):
-    query = db.query(Booking).options(joinedload(Booking.items))
+    query = db.query(Booking)
 
     if status_filter:
         query = query.filter(Booking.status == status_filter)
@@ -58,7 +62,23 @@ def admin_list_bookings(
             | (Booking.booking_reference.ilike(like))
         )
 
-    return query.order_by(Booking.created_at.desc()).all()
+    query = query.order_by(Booking.created_at.desc())
+
+    # Counted before the joinedload is added — Booking.items is a collection, and
+    # counting a joined collection would count booking+item combinations, not bookings.
+    total_rows = query.count()
+    total_pages, offset, limit = get_pagination(total_rows, page, page_size)
+
+    items = query.options(joinedload(Booking.items)).offset(offset).limit(limit).all()
+    current_page = 1 if total_pages == 0 else min(max(page, 1), total_pages)
+
+    return {
+        "items": items,
+        "total_pages": total_pages,
+        "current_page": current_page,
+        "page_size": page_size,
+        "total_rows": total_rows,
+    }
 
 
 @admin_router.get("/{booking_id}", response_model=BookingOut)

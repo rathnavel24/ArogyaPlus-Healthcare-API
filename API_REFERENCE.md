@@ -12,6 +12,18 @@ All request/response bodies are JSON unless noted (uploads use `multipart/form-d
 
 **Errors:** validation failures return `422` with FastAPI's standard `{"detail": [...]}` shape. Business-rule failures (duplicate name, wrong password, not found) return `400`/`404` with `{"detail": "<message>"}`.
 
+**Pagination:** the list endpoints marked 📄 below take `page` (default `1`) and `page_size` (default `10`, max `100`) query params and return an envelope instead of a bare array:
+```json
+{
+  "items": [ /* the actual records for this page */ ],
+  "total_pages": 5,
+  "current_page": 1,
+  "page_size": 10,
+  "total_rows": 47
+}
+```
+`current_page` is clamped server-side to `[1, total_pages]` — e.g. requesting `page=99` on a 5-page result set returns page 5's items with `current_page: 5`, not an empty page. Endpoints without 📄 still return a plain array (unchanged).
+
 ---
 
 ## Auth
@@ -74,9 +86,9 @@ Auth required. Body: `{ "current_password": "...", "new_password": "..." }` (min
 
 | Method | Path | Auth | Notes |
 |---|---|---|---|
-| GET | `/packages` | No | Query: `search`, `category`, `sort` (`price_asc`\|`price_desc`). Only active, non-deleted packages. |
+| GET 📄 | `/packages` | No | Query: `search`, `category`, `sort` (`price_asc`\|`price_desc`), `page`, `page_size`. Only active, non-deleted packages. |
 | GET | `/packages/{id}` | No | 404 if inactive/missing. |
-| GET | `/admin/packages` | Yes | All packages incl. inactive. |
+| GET 📄 | `/admin/packages` | Yes | All packages incl. inactive. |
 | GET | `/admin/packages/{id}` | Yes | |
 | POST | `/admin/packages` | Yes | Body below. |
 | PUT | `/admin/packages/{id}` | Yes | Partial update — send only changed fields. |
@@ -131,9 +143,9 @@ Auth required. Body: `{ "current_password": "...", "new_password": "..." }` (min
 
 | Method | Path | Auth | Notes |
 |---|---|---|---|
-| GET | `/tests` | No | Query: `search`, `category`, `sort` (`price_asc`\|`price_desc`). |
+| GET 📄 | `/tests` | No | Query: `search`, `category`, `sort` (`price_asc`\|`price_desc`), `page`, `page_size`. |
 | GET | `/tests/{id}` | No | |
-| GET | `/admin/tests` | Yes | |
+| GET 📄 | `/admin/tests` | Yes | |
 | GET | `/admin/tests/{id}` | Yes | |
 | POST | `/admin/tests` | Yes | Body = `Test` fields (no `parameters`/`parameter_ids` — see linking endpoints below). |
 | PUT | `/admin/tests/{id}` | Yes | Partial update. |
@@ -190,7 +202,7 @@ There is no public/customer-facing parameters endpoint — these are only ever v
 
 | Method | Path | Auth | Notes |
 |---|---|---|---|
-| GET | `/admin/parameters` | Yes | Query: `search` (name, case-insensitive). Ordered by name. |
+| GET 📄 | `/admin/parameters` | Yes | Query: `search` (name, case-insensitive), `page`, `page_size`. Ordered by name. |
 | POST | `/admin/parameters` | Yes | `name` required + unique; `400` if taken. |
 | PUT | `/admin/parameters/{id}` | Yes | Partial update; renaming to a taken name → `400`. |
 | DELETE | `/admin/parameters/{id}` | Yes | `204`. Also unlinks it from every test. |
@@ -244,7 +256,7 @@ There is no public/customer-facing parameters endpoint — these are only ever v
 | Method | Path | Auth | Notes |
 |---|---|---|---|
 | POST | `/bookings` | No | Creates booking, fires WhatsApp notification. |
-| GET | `/admin/bookings` | Yes | Query: `search` (name/phone/email/reference), `status_filter` (`New`\|`Contacted`\|`Done`), `booking_date`. |
+| GET 📄 | `/admin/bookings` | Yes | Query: `search` (name/phone/email/reference), `status_filter` (`New`\|`Contacted`\|`Done`), `booking_date`, `page`, `page_size`. |
 | GET | `/admin/bookings/{id}` | Yes | |
 | PATCH | `/admin/bookings/{id}/status` | Yes | Body `{ "status": "Contacted" }`. |
 | GET | `/admin/dashboard/stats` | Yes | Counts + `recent_bookings` (last 5, full `Booking` shape incl. `address`). |
@@ -302,8 +314,8 @@ Validation is strict: `customer_name` letters/spaces/`.`/`'`/`-` only, `preferre
 
 | Method | Path | Auth | Notes |
 |---|---|---|---|
-| GET | `/banners` | No | Active banners only, ordered by `display_order`. |
-| GET | `/admin/banners` | Yes | All banners, incl. inactive. |
+| GET | `/banners` | No | Active banners only, ordered by `display_order`. Not paginated — returns a plain array. |
+| GET 📄 | `/admin/banners` | Yes | All banners, incl. inactive. |
 | POST | `/admin/banners` | Yes | `image_url` + `is_active` required, rest optional. `201`. |
 | PUT | `/admin/banners/{id}` | Yes | Partial update, `404` if missing. |
 | DELETE | `/admin/banners/{id}` | Yes | `204`, soft delete. |
@@ -336,5 +348,7 @@ If you integrated against an earlier version of this API, only these are new/cha
 - `parameters[]` is now on every `Test` response (was previously absent) — default `[]`, non-breaking.
 - New resource: **Parameters** (`/admin/parameters`) + **Test↔Parameter linking** (`/admin/tests/{id}/parameters...`).
 - `PATCH /auth/me` now returns `400` for a duplicate email (previously silently allowed it).
+- `phone` on `POST /bookings` now accepts a leading `+` and country code (e.g. `+971501234567`).
+- **Breaking:** `GET /packages`, `GET /tests`, `GET /admin/packages`, `GET /admin/tests`, `GET /admin/bookings`, `GET /admin/parameters`, `GET /admin/banners` (marked 📄 above) now return the paginated envelope `{ items, total_pages, current_page, page_size, total_rows }` instead of a bare array — update anywhere you were reading these responses directly as a list.
 
 Everything else (`/banners`, `/admin/uploads/image`, base package/test pricing fields) was already live and is unchanged.

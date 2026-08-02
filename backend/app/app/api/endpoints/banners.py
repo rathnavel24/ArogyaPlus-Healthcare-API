@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
@@ -6,6 +6,8 @@ from app.core.security import get_current_admin
 from app.models.admin import Admin
 from app.models.banner import Banner
 from app.schemas.banner import BannerCreate, BannerOut, BannerUpdate
+from app.schemas.pagination import PaginatedResponse
+from app.utils import paginate_query
 
 public_router = APIRouter(prefix="/api/banners", tags=["banners"])
 admin_router = APIRouter(prefix="/api/admin/banners", tags=["admin-banners"])
@@ -21,14 +23,15 @@ def list_banners(db: Session = Depends(get_db)):
     )
 
 
-@admin_router.get("", response_model=list[BannerOut])
-def admin_list_banners(db: Session = Depends(get_db), current_admin: Admin = Depends(get_current_admin)):
-    return (
-        db.query(Banner)
-        .filter(Banner.status != -1)
-        .order_by(Banner.display_order.asc(), Banner.id.asc())
-        .all()
-    )
+@admin_router.get("", response_model=PaginatedResponse[BannerOut])
+def admin_list_banners(
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=10, ge=1, le=100),
+    db: Session = Depends(get_db),
+    current_admin: Admin = Depends(get_current_admin),
+):
+    query = db.query(Banner).filter(Banner.status != -1).order_by(Banner.display_order.asc(), Banner.id.asc())
+    return paginate_query(query, page, page_size)
 
 
 @admin_router.post("", response_model=BannerOut, status_code=status.HTTP_201_CREATED)

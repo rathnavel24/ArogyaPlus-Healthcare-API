@@ -1,6 +1,6 @@
 from typing import Literal
 
-from fastapi import APIRouter, Body, Depends, HTTPException, status
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
@@ -9,6 +9,8 @@ from app.models.admin import Admin
 from app.models.package import Package
 from app.models.test import Test
 from app.schemas.package import PackageCreate, PackageOut, PackageUpdate
+from app.schemas.pagination import PaginatedResponse
+from app.utils import paginate_query
 
 public_router = APIRouter(prefix="/api/packages", tags=["packages"])
 admin_router = APIRouter(prefix="/api/admin/packages", tags=["admin-packages"])
@@ -31,17 +33,19 @@ def _apply_sort(query, sort: str | None, visit_mode: str = "lab"):
     return query.order_by(Package.name.asc())
 
 
-@public_router.get("", response_model=list[PackageOut])
+@public_router.get("", response_model=PaginatedResponse[PackageOut])
 def list_packages(
     search: str | None = None,
     category: str | None = None,
     sort: Literal["price_asc", "price_desc"] | None = None,
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=10, ge=1, le=100),
     db: Session = Depends(get_db),
 ):
     query = db.query(Package).filter(Package.is_active.is_(True), Package.status != -1)
     query = _apply_filters(query, search, category)
     query = _apply_sort(query, sort)
-    return query.all()
+    return paginate_query(query, page, page_size)
 
 
 @public_router.get("/{package_id}", response_model=PackageOut)
@@ -52,9 +56,15 @@ def get_package(package_id: int, db: Session = Depends(get_db)):
     return package
 
 
-@admin_router.get("", response_model=list[PackageOut])
-def admin_list_packages(db: Session = Depends(get_db), current_admin: Admin = Depends(get_current_admin)):
-    return db.query(Package).filter(Package.status != -1).order_by(Package.name.asc()).all()
+@admin_router.get("", response_model=PaginatedResponse[PackageOut])
+def admin_list_packages(
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=10, ge=1, le=100),
+    db: Session = Depends(get_db),
+    current_admin: Admin = Depends(get_current_admin),
+):
+    query = db.query(Package).filter(Package.status != -1).order_by(Package.name.asc())
+    return paginate_query(query, page, page_size)
 
 
 @admin_router.get("/{package_id}", response_model=PackageOut)
