@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 
-from app.api.endpoints import auth, banners, bookings, notifications, packages, site_content, tests, uploads
+from app.api.endpoints import auth, banners, bookings, notifications, packages, parameters, site_content, tests, uploads
 
 api_router = APIRouter()
 
@@ -9,6 +9,7 @@ api_router.include_router(packages.public_router)
 api_router.include_router(packages.admin_router)
 api_router.include_router(tests.public_router)
 api_router.include_router(tests.admin_router)
+api_router.include_router(parameters.admin_router)
 api_router.include_router(bookings.public_router)
 api_router.include_router(bookings.admin_router)
 api_router.include_router(bookings.dashboard_router)

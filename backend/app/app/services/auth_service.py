@@ -34,6 +34,12 @@ def update_admin_profile(db: Session, admin: Admin, payload: AdminProfileUpdate)
         admin.password_hash = hash_password(payload.new_password)
 
     if payload.email:
+        duplicate = db.query(Admin).filter(Admin.email == payload.email, Admin.id != admin.id).first()
+        if duplicate is not None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Email is already in use.",
+            )
         admin.email = payload.email
 
     db.commit()

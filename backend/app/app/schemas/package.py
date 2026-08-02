@@ -18,6 +18,7 @@ class PackageBase(BaseModel):
     tat: str | None = Field(default=None, max_length=50)
     is_active: bool = True
     is_featured: bool = False
+    display_order: int | None = None
 
 
 class PackageCreate(PackageBase):
@@ -36,6 +37,7 @@ class PackageUpdate(BaseModel):
     tat: str | None = Field(default=None, max_length=50)
     is_active: bool | None = None
     is_featured: bool | None = None
+    display_order: int | None = None
     test_ids: list[int] | None = None
 
 

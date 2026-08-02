@@ -1,7 +1,7 @@
 from datetime import date, datetime
 from decimal import Decimal
 
-from sqlalchemy import Date, DateTime, ForeignKey, Integer, Numeric, String, func
+from sqlalchemy import Date, DateTime, ForeignKey, Integer, Numeric, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base_class import Base
@@ -18,6 +18,7 @@ class Booking(Base):
     gender: Mapped[str] = mapped_column(String(10), nullable=False)
     phone: Mapped[str] = mapped_column(String(30), nullable=False)
     email: Mapped[str] = mapped_column(String(255), nullable=False)
+    address: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     preferred_date: Mapped[date] = mapped_column(Date, nullable=False)
     time_slot: Mapped[str] = mapped_column(String(20), nullable=False)

@@ -57,6 +57,7 @@ def create_booking(db: Session, booking_in: BookingCreate) -> Booking:
         gender=booking_in.gender,
         phone=booking_in.phone,
         email=booking_in.email,
+        address=booking_in.address,
         preferred_date=booking_in.preferred_date,
         time_slot=booking_in.time_slot,
         visit_mode=booking_in.visit_mode,

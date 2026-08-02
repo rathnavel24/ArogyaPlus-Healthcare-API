@@ -8,3 +8,5 @@ from app.models.package_test import package_tests  # noqa: F401
 from app.models.booking import Booking, BookingItem  # noqa: F401
 from app.models.site_content import SiteContent  # noqa: F401
 from app.models.banner import Banner  # noqa: F401
+from app.models.parameter import Parameter  # noqa: F401
+from app.models.test_parameter import TestParameter  # noqa: F401

@@ -36,6 +36,7 @@ class BookingCreate(BaseModel):
     gender: Literal["Male", "Female"]
     phone: str = Field(min_length=7, max_length=30)
     email: EmailStr
+    address: str | None = None
     preferred_date: date
     time_slot: str
     visit_mode: Literal["home", "lab"]
@@ -85,6 +86,7 @@ class BookingOut(BaseModel):
     gender: str
     phone: str
     email: str
+    address: str | None = None
     preferred_date: date
     time_slot: str
     visit_mode: str
