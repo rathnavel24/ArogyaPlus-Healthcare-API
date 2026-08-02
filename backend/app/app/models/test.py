@@ -1,11 +1,13 @@
 from datetime import datetime
 from decimal import Decimal
+from inspect import Parameter
 
 from sqlalchemy import Boolean, DateTime, Integer, Numeric, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base_class import Base
 from app.models.package_test import package_tests
+from app.models.test_parameter import TestParameter
 
 
 class Test(Base):
