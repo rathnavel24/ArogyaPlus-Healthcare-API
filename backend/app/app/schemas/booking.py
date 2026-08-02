@@ -11,7 +11,7 @@ TIME_SLOTS = [
 ]
 
 NAME_PATTERN = re.compile(r"^[A-Za-z\s.'-]+$")
-PHONE_PATTERN = re.compile(r"^\d{7,15}$")
+PHONE_PATTERN = re.compile(r"^\+?\d{7,15}$")
 
 
 class BookingItemIn(BaseModel):
@@ -52,9 +52,11 @@ class BookingCreate(BaseModel):
     @field_validator("phone")
     @classmethod
     def phone_digits_only(cls, value: str) -> str:
-        cleaned = value.strip()
+        cleaned = re.sub(r"[\s\-()]", "", value.strip())
         if not PHONE_PATTERN.match(cleaned):
-            raise ValueError("Phone number must contain digits only (7-15 digits).")
+            raise ValueError(
+                "Phone number must be digits only (7-15 digits), optionally prefixed with '+' and a country code."
+            )
         return cleaned
 
     @field_validator("time_slot")

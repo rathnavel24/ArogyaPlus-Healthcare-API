@@ -276,7 +276,9 @@ There is no public/customer-facing parameters endpoint — these are only ever v
   "message": "Your booking has been received. Our team will contact you shortly."
 }
 ```
-Validation is strict: `customer_name` letters/spaces/`.`/`'`/`-` only, `phone` 7–15 digits only, `preferred_date` can't be in the past, `time_slot` must match the list above exactly — expect `422` with per-field messages if you skip client-side validation.
+Validation is strict: `customer_name` letters/spaces/`.`/`'`/`-` only, `preferred_date` can't be in the past, `time_slot` must match the list above exactly — expect `422` with per-field messages if you skip client-side validation.
+
+`phone`: 7–15 digits, an optional leading `+` and country code is allowed (e.g. `+971501234567`), and spaces/dashes/parens are stripped automatically server-side — so `+971 50 123 4567` and `+971501234567` both normalize to the same stored value. Don't strip the `+` yourself before sending; just pass whatever the phone input gives you.
 
 ---
 
