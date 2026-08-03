@@ -314,11 +314,35 @@ Validation is strict: `customer_name` letters/spaces/`.`/`'`/`-` only, `preferre
 
 | Method | Path | Auth | Notes |
 |---|---|---|---|
-| GET | `/banners` | No | Active banners only, ordered by `display_order`. Not paginated — returns a plain array. |
-| GET 📄 | `/admin/banners` | Yes | All banners, incl. inactive. |
+| GET | `/banners` | No | Active banners only, ordered by `display_order`. Not paginated — returns a plain array, unchanged. |
+| GET 📄 | `/admin/banners` | Yes | All banners, incl. inactive. Query: `page`, `page_size`. |
 | POST | `/admin/banners` | Yes | `image_url` + `is_active` required, rest optional. `201`. |
 | PUT | `/admin/banners/{id}` | Yes | Partial update, `404` if missing. |
 | DELETE | `/admin/banners/{id}` | Yes | `204`, soft delete. |
+
+`GET /banners` (public) still returns a bare `Banner[]` array — unchanged. `GET /admin/banners` now returns the paginated envelope instead of a bare array:
+```json
+{
+  "items": [
+    {
+      "id": 1,
+      "image_url": "https://...",
+      "title": "Summer Health Check",
+      "subtitle": "Up to 30% off all packages",
+      "tags": "Sale,Featured",
+      "link_url": "/packages",
+      "display_order": 0,
+      "is_active": true,
+      "created_at": "2026-01-01T10:00:00Z"
+    }
+  ],
+  "total_pages": 1,
+  "current_page": 1,
+  "page_size": 10,
+  "total_rows": 3
+}
+```
+The `Banner` object itself is unchanged — only how the admin list is wrapped.
 
 ---
 

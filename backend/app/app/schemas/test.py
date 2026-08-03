@@ -17,6 +17,15 @@ class TestBase(BaseModel):
     original_lab_price: Decimal | None = Field(default=None, ge=0)
     original_home_price: Decimal | None = Field(default=None, ge=0)
     tat: str | None = Field(default=None, max_length=50)
+    test_code: str | None = Field(default=None, max_length=50)
+    b2b_price: Decimal | None = Field(default=None, ge=0)
+    mrp: Decimal | None = Field(default=None, ge=0)
+    parameters_count: int | None = None
+    tube1: str | None = Field(default=None, max_length=50)
+    tube2: str | None = Field(default=None, max_length=50)
+    tube3: str | None = Field(default=None, max_length=50)
+    tube4: str | None = Field(default=None, max_length=50)
+    included_items: str | None = None
     is_active: bool = True
     display_order: int | None = None
 
@@ -36,6 +45,15 @@ class TestUpdate(BaseModel):
     original_lab_price: Decimal | None = Field(default=None, ge=0)
     original_home_price: Decimal | None = Field(default=None, ge=0)
     tat: str | None = Field(default=None, max_length=50)
+    test_code: str | None = Field(default=None, max_length=50)
+    b2b_price: Decimal | None = Field(default=None, ge=0)
+    mrp: Decimal | None = Field(default=None, ge=0)
+    parameters_count: int | None = None
+    tube1: str | None = Field(default=None, max_length=50)
+    tube2: str | None = Field(default=None, max_length=50)
+    tube3: str | None = Field(default=None, max_length=50)
+    tube4: str | None = Field(default=None, max_length=50)
+    included_items: str | None = None
     is_active: bool | None = None
     display_order: int | None = None
 

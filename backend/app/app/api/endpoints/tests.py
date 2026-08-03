@@ -1,7 +1,7 @@
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import func
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
@@ -54,12 +54,19 @@ def get_test(test_id: int, db: Session = Depends(get_db)):
 
 @admin_router.get("", response_model=PaginatedResponse[TestOut])
 def admin_list_tests(
+    search: str | None = None,
+    category: str | None = None,
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=10, ge=1, le=100),
     db: Session = Depends(get_db),
     current_admin: Admin = Depends(get_current_admin),
 ):
-    query = db.query(Test).filter(Test.status != -1).order_by(Test.name.asc())
+    query = db.query(Test).filter(Test.status != -1)
+    if search:
+        query = query.filter(or_(Test.name.ilike(f"%{search}%"), Test.test_code.ilike(f"%{search}%")))
+    if category:
+        query = query.filter(Test.category == category)
+    query = query.order_by(Test.name.asc())
     return paginate_query(query, page, page_size)
 
 

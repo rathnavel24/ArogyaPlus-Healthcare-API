@@ -1,6 +1,7 @@
 from typing import Literal
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query, status
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
@@ -58,12 +59,19 @@ def get_package(package_id: int, db: Session = Depends(get_db)):
 
 @admin_router.get("", response_model=PaginatedResponse[PackageOut])
 def admin_list_packages(
+    search: str | None = None,
+    category: str | None = None,
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=10, ge=1, le=100),
     db: Session = Depends(get_db),
     current_admin: Admin = Depends(get_current_admin),
 ):
-    query = db.query(Package).filter(Package.status != -1).order_by(Package.name.asc())
+    query = db.query(Package).filter(Package.status != -1)
+    if search:
+        query = query.filter(or_(Package.name.ilike(f"%{search}%"), Package.test_code.ilike(f"%{search}%")))
+    if category:
+        query = query.filter(Package.category == category)
+    query = query.order_by(Package.name.asc())
     return paginate_query(query, page, page_size)
 
 
