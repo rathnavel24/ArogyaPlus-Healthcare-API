@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
@@ -33,7 +34,9 @@ def create_parameter(
     payload: ParameterCreate, db: Session = Depends(get_db), current_admin: Admin = Depends(get_current_admin)
 ):
     existing = (
-        db.query(Parameter).filter(Parameter.name == payload.name, Parameter.status != -1).first()
+        db.query(Parameter)
+        .filter(func.lower(Parameter.name) == payload.name.lower(), Parameter.status != -1)
+        .first()
     )
     if existing is not None:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Parameter name is already taken.")
@@ -61,7 +64,11 @@ def update_parameter(
     if "name" in update_data:
         duplicate = (
             db.query(Parameter)
-            .filter(Parameter.name == update_data["name"], Parameter.id != parameter_id, Parameter.status != -1)
+            .filter(
+                func.lower(Parameter.name) == update_data["name"].lower(),
+                Parameter.id != parameter_id,
+                Parameter.status != -1,
+            )
             .first()
         )
         if duplicate is not None:

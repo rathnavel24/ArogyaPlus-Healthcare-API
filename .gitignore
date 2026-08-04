@@ -11,3 +11,7 @@ __pycache__/
 myenv
 .claude
 CLAUDE.md
+
+# cPanel/Passenger runtime artifacts (server-generated, not source)
+backend/app/stderr.log
+backend/app/tmp/

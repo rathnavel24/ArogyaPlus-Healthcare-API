@@ -1,7 +1,7 @@
 from typing import Literal
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query, status
-from sqlalchemy import or_
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
@@ -89,6 +89,14 @@ def admin_get_package(
 def create_package(
     payload: PackageCreate, db: Session = Depends(get_db), current_admin: Admin = Depends(get_current_admin)
 ):
+    existing = (
+        db.query(Package)
+        .filter(func.lower(Package.name) == payload.name.lower(), Package.status != -1)
+        .first()
+    )
+    if existing is not None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Package name is already taken.")
+
     data = payload.model_dump(exclude={"test_ids"})
     package = Package(**data)
 
@@ -113,6 +121,20 @@ def update_package(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Package not found.")
 
     update_data = payload.model_dump(exclude_unset=True, exclude={"test_ids"})
+
+    if "name" in update_data:
+        duplicate = (
+            db.query(Package)
+            .filter(
+                func.lower(Package.name) == update_data["name"].lower(),
+                Package.id != package_id,
+                Package.status != -1,
+            )
+            .first()
+        )
+        if duplicate is not None:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Package name is already taken.")
+
     for field, value in update_data.items():
         setattr(package, field, value)
 

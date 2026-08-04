@@ -80,6 +80,12 @@ def admin_get_test(test_id: int, db: Session = Depends(get_db), current_admin: A
 
 @admin_router.post("", response_model=TestOut, status_code=status.HTTP_201_CREATED)
 def create_test(payload: TestCreate, db: Session = Depends(get_db), current_admin: Admin = Depends(get_current_admin)):
+    existing = (
+        db.query(Test).filter(func.lower(Test.name) == payload.name.lower(), Test.status != -1).first()
+    )
+    if existing is not None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Test name is already taken.")
+
     test = Test(**payload.model_dump())
     db.add(test)
     db.commit()
@@ -98,7 +104,22 @@ def update_test(
     if test is None or test.status == -1:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Test not found.")
 
-    for field, value in payload.model_dump(exclude_unset=True).items():
+    update_data = payload.model_dump(exclude_unset=True)
+
+    if "name" in update_data:
+        duplicate = (
+            db.query(Test)
+            .filter(
+                func.lower(Test.name) == update_data["name"].lower(),
+                Test.id != test_id,
+                Test.status != -1,
+            )
+            .first()
+        )
+        if duplicate is not None:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Test name is already taken.")
+
+    for field, value in update_data.items():
         setattr(test, field, value)
 
     db.commit()
