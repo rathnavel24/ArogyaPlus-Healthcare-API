@@ -13,7 +13,10 @@ from app.db.base import Base  # noqa: F401  (imports all models for autogenerate
 config = context.config
 
 # Pull the DB URL from app settings (.env) instead of hardcoding it in alembic.ini.
-config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
+# `%` is escaped as `%%` because alembic.ini is backed by configparser, which treats
+# a lone `%` as interpolation syntax and raises if the URL contains a %-encoded
+# character (e.g. `%40` for `@` in a password).
+config.set_main_option("sqlalchemy.url", settings.DATABASE_URL.replace("%", "%%"))
 
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.
