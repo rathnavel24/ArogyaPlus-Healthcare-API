@@ -7,7 +7,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     # Database
-    DATABASE_URL: str = "postgresql://arogyaplus:arogyaplus@localhost:5432/arogyaplus"
+    DATABASE_URL: str = "mysql+pymysql://arogyaplus:arogyaplus@localhost:3306/arogyaplus"
 
     # JWT
     JWT_SECRET_KEY: str = "change-this-to-a-long-random-secret"
