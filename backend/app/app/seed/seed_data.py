@@ -9,6 +9,8 @@ parameter catalog imported from the lab's parameter sheet. Safe to run
 multiple times - existing records are left untouched.
 """
 
+from sqlalchemy import select
+
 from app.core.config import settings
 from app.core.security import hash_password
 from app.db.base import Base  # noqa: F401  (imports all models for metadata.create_all)
@@ -913,7 +915,7 @@ PARAMETERS_DATA = [
 
 
 def seed_admin(db) -> None:
-    existing = db.query(Admin).filter(Admin.username == settings.ADMIN_USERNAME).first()
+    existing = db.scalar(select(Admin).where(Admin.username == settings.ADMIN_USERNAME))
     if existing:
         print(f"Admin '{settings.ADMIN_USERNAME}' already exists - skipped.")
         return
@@ -931,7 +933,7 @@ def seed_parameters(db) -> None:
     created = 0
     for row in PARAMETERS_DATA:
         data = dict(zip(PARAMETER_FIELDS, row))
-        existing = db.query(Parameter).filter(Parameter.name == data["name"]).first()
+        existing = db.scalar(select(Parameter.id).where(Parameter.name == data["name"]))
         if existing:
             continue
         db.add(Parameter(**data))

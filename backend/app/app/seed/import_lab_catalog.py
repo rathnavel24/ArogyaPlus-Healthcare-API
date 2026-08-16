@@ -15,6 +15,8 @@ import csv
 import sys
 from decimal import Decimal, InvalidOperation
 
+from sqlalchemy import select
+
 from app.db.base import Base  # noqa: F401
 from app.db.session import SessionLocal, engine
 from app.models.package import Package
@@ -106,9 +108,9 @@ def upsert_test(db, row: dict) -> Test:
 
     test = None
     if test_code:
-        test = db.query(Test).filter(Test.test_code == test_code).first()
+        test = db.scalar(select(Test).where(Test.test_code == test_code))
     if test is None:
-        test = db.query(Test).filter(Test.name == name).first()
+        test = db.scalar(select(Test).where(Test.name == name))
     if test is None:
         test = Test(name=name, lab_price=price, home_price=price)
         db.add(test)
@@ -139,9 +141,9 @@ def upsert_package(db, row: dict) -> Package:
 
     package = None
     if test_code:
-        package = db.query(Package).filter(Package.test_code == test_code).first()
+        package = db.scalar(select(Package).where(Package.test_code == test_code))
     if package is None:
-        package = db.query(Package).filter(Package.name == name).first()
+        package = db.scalar(select(Package).where(Package.name == name))
     if package is None:
         package = Package(name=name, lab_price=price, home_price=price)
         db.add(package)
@@ -197,7 +199,7 @@ def run_import(path: str) -> None:
             upsert_test(db, row)
         db.flush()
 
-        tests_by_name = {t.name.lower(): t for t in db.query(Test).all()}
+        tests_by_name = {t.name.lower(): t for t in db.scalars(select(Test))}
 
         print(f"Importing {len(profile_rows)} profiles as packages...")
         total_links = 0

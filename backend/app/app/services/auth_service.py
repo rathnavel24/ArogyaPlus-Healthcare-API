@@ -1,5 +1,5 @@
 from fastapi import HTTPException, status
-from sqlalchemy import or_
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from app.core.security import create_access_token, hash_password, verify_password
@@ -8,10 +8,8 @@ from app.schemas.auth import AdminProfileUpdate, PasswordChange
 
 
 def authenticate_admin(db: Session, username_or_email: str, password: str) -> Admin | None:
-    admin = (
-        db.query(Admin)
-        .filter(or_(Admin.username == username_or_email, Admin.email == username_or_email))
-        .first()
+    admin = db.scalar(
+        select(Admin).where(or_(Admin.username == username_or_email, Admin.email == username_or_email))
     )
     if admin is None:
         return None
@@ -34,8 +32,8 @@ def update_admin_profile(db: Session, admin: Admin, payload: AdminProfileUpdate)
         admin.password_hash = hash_password(payload.new_password)
 
     if payload.email:
-        duplicate = db.query(Admin).filter(Admin.email == payload.email, Admin.id != admin.id).first()
-        if duplicate is not None:
+        duplicate_id = db.scalar(select(Admin.id).where(Admin.email == payload.email, Admin.id != admin.id))
+        if duplicate_id is not None:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Email is already in use.",

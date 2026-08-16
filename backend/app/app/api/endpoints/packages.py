@@ -1,7 +1,7 @@
 from typing import Literal
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query, status
-from sqlalchemy import func, or_
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
@@ -17,21 +17,21 @@ public_router = APIRouter(prefix="/api/packages", tags=["packages"])
 admin_router = APIRouter(prefix="/api/admin/packages", tags=["admin-packages"])
 
 
-def _apply_filters(query, search: str | None, category: str | None):
+def _apply_filters(stmt, search: str | None, category: str | None):
     if search:
-        query = query.filter(Package.name.ilike(f"%{search}%"))
+        stmt = stmt.where(Package.name.ilike(f"%{search}%"))
     if category:
-        query = query.filter(Package.category == category)
-    return query
+        stmt = stmt.where(Package.category == category)
+    return stmt
 
 
-def _apply_sort(query, sort: str | None, visit_mode: str = "lab"):
+def _apply_sort(stmt, sort: str | None, visit_mode: str = "lab"):
     price_column = Package.home_price if visit_mode == "home" else Package.lab_price
     if sort == "price_asc":
-        return query.order_by(price_column.asc())
+        return stmt.order_by(price_column.asc())
     if sort == "price_desc":
-        return query.order_by(price_column.desc())
-    return query.order_by(Package.name.asc())
+        return stmt.order_by(price_column.desc())
+    return stmt.order_by(Package.name.asc())
 
 
 @public_router.get("", response_model=PaginatedResponse[PackageOut])
@@ -43,10 +43,10 @@ def list_packages(
     page_size: int = Query(default=10, ge=1, le=100),
     db: Session = Depends(get_db),
 ):
-    query = db.query(Package).filter(Package.is_active.is_(True), Package.status != -1)
-    query = _apply_filters(query, search, category)
-    query = _apply_sort(query, sort)
-    return paginate_query(query, page, page_size)
+    stmt = select(Package).where(Package.is_active.is_(True), Package.status != -1)
+    stmt = _apply_filters(stmt, search, category)
+    stmt = _apply_sort(stmt, sort)
+    return paginate_query(db, stmt, page, page_size)
 
 
 @public_router.get("/{package_id}", response_model=PackageOut)
@@ -66,13 +66,13 @@ def admin_list_packages(
     db: Session = Depends(get_db),
     current_admin: Admin = Depends(get_current_admin),
 ):
-    query = db.query(Package).filter(Package.status != -1)
+    stmt = select(Package).where(Package.status != -1)
     if search:
-        query = query.filter(or_(Package.name.ilike(f"%{search}%"), Package.test_code.ilike(f"%{search}%")))
+        stmt = stmt.where(or_(Package.name.ilike(f"%{search}%"), Package.test_code.ilike(f"%{search}%")))
     if category:
-        query = query.filter(Package.category == category)
-    query = query.order_by(Package.name.asc())
-    return paginate_query(query, page, page_size)
+        stmt = stmt.where(Package.category == category)
+    stmt = stmt.order_by(Package.name.asc())
+    return paginate_query(db, stmt, page, page_size)
 
 
 @admin_router.get("/{package_id}", response_model=PackageOut)
@@ -89,19 +89,19 @@ def admin_get_package(
 def create_package(
     payload: PackageCreate, db: Session = Depends(get_db), current_admin: Admin = Depends(get_current_admin)
 ):
-    existing = (
-        db.query(Package)
-        .filter(func.lower(Package.name) == payload.name.lower(), Package.status != -1)
-        .first()
+    existing_id = db.scalar(
+        select(Package.id).where(func.lower(Package.name) == payload.name.lower(), Package.status != -1)
     )
-    if existing is not None:
+    if existing_id is not None:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Package name is already taken.")
 
     data = payload.model_dump(exclude={"test_ids"})
     package = Package(**data)
 
     if payload.test_ids:
-        package.tests = db.query(Test).filter(Test.id.in_(payload.test_ids), Test.status != -1).all()
+        package.tests = list(
+            db.scalars(select(Test).where(Test.id.in_(payload.test_ids), Test.status != -1))
+        )
 
     db.add(package)
     db.commit()
@@ -123,23 +123,23 @@ def update_package(
     update_data = payload.model_dump(exclude_unset=True, exclude={"test_ids"})
 
     if "name" in update_data:
-        duplicate = (
-            db.query(Package)
-            .filter(
+        duplicate_id = db.scalar(
+            select(Package.id).where(
                 func.lower(Package.name) == update_data["name"].lower(),
                 Package.id != package_id,
                 Package.status != -1,
             )
-            .first()
         )
-        if duplicate is not None:
+        if duplicate_id is not None:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Package name is already taken.")
 
     for field, value in update_data.items():
         setattr(package, field, value)
 
     if payload.test_ids is not None:
-        package.tests = db.query(Test).filter(Test.id.in_(payload.test_ids), Test.status != -1).all()
+        package.tests = list(
+            db.scalars(select(Test).where(Test.id.in_(payload.test_ids), Test.status != -1))
+        )
 
     db.commit()
     db.refresh(package)
@@ -169,7 +169,7 @@ def set_package_tests(
     if package is None or package.status == -1:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Package not found.")
 
-    package.tests = db.query(Test).filter(Test.id.in_(test_ids), Test.status != -1).all()
+    package.tests = list(db.scalars(select(Test).where(Test.id.in_(test_ids), Test.status != -1)))
     db.commit()
     db.refresh(package)
     return package

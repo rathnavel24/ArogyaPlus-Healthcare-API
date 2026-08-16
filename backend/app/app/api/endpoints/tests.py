@@ -1,7 +1,7 @@
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import func, or_
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
@@ -18,12 +18,12 @@ public_router = APIRouter(prefix="/api/tests", tags=["tests"])
 admin_router = APIRouter(prefix="/api/admin/tests", tags=["admin-tests"])
 
 
-def _apply_sort(query, sort: str | None):
+def _apply_sort(stmt, sort: str | None):
     if sort == "price_asc":
-        return query.order_by(Test.lab_price.asc())
+        return stmt.order_by(Test.lab_price.asc())
     if sort == "price_desc":
-        return query.order_by(Test.lab_price.desc())
-    return query.order_by(Test.name.asc())
+        return stmt.order_by(Test.lab_price.desc())
+    return stmt.order_by(Test.name.asc())
 
 
 @public_router.get("", response_model=PaginatedResponse[TestOut])
@@ -35,13 +35,13 @@ def list_tests(
     page_size: int = Query(default=10, ge=1, le=100),
     db: Session = Depends(get_db),
 ):
-    query = db.query(Test).filter(Test.is_active.is_(True), Test.status != -1)
+    stmt = select(Test).where(Test.is_active.is_(True), Test.status != -1)
     if search:
-        query = query.filter(Test.name.ilike(f"%{search}%"))
+        stmt = stmt.where(Test.name.ilike(f"%{search}%"))
     if category:
-        query = query.filter(Test.category == category)
-    query = _apply_sort(query, sort)
-    return paginate_query(query, page, page_size)
+        stmt = stmt.where(Test.category == category)
+    stmt = _apply_sort(stmt, sort)
+    return paginate_query(db, stmt, page, page_size)
 
 
 @public_router.get("/{test_id}", response_model=TestOut)
@@ -61,13 +61,13 @@ def admin_list_tests(
     db: Session = Depends(get_db),
     current_admin: Admin = Depends(get_current_admin),
 ):
-    query = db.query(Test).filter(Test.status != -1)
+    stmt = select(Test).where(Test.status != -1)
     if search:
-        query = query.filter(or_(Test.name.ilike(f"%{search}%"), Test.test_code.ilike(f"%{search}%")))
+        stmt = stmt.where(or_(Test.name.ilike(f"%{search}%"), Test.test_code.ilike(f"%{search}%")))
     if category:
-        query = query.filter(Test.category == category)
-    query = query.order_by(Test.name.asc())
-    return paginate_query(query, page, page_size)
+        stmt = stmt.where(Test.category == category)
+    stmt = stmt.order_by(Test.name.asc())
+    return paginate_query(db, stmt, page, page_size)
 
 
 @admin_router.get("/{test_id}", response_model=TestOut)
@@ -80,10 +80,10 @@ def admin_get_test(test_id: int, db: Session = Depends(get_db), current_admin: A
 
 @admin_router.post("", response_model=TestOut, status_code=status.HTTP_201_CREATED)
 def create_test(payload: TestCreate, db: Session = Depends(get_db), current_admin: Admin = Depends(get_current_admin)):
-    existing = (
-        db.query(Test).filter(func.lower(Test.name) == payload.name.lower(), Test.status != -1).first()
+    existing_id = db.scalar(
+        select(Test.id).where(func.lower(Test.name) == payload.name.lower(), Test.status != -1)
     )
-    if existing is not None:
+    if existing_id is not None:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Test name is already taken.")
 
     test = Test(**payload.model_dump())
@@ -107,16 +107,14 @@ def update_test(
     update_data = payload.model_dump(exclude_unset=True)
 
     if "name" in update_data:
-        duplicate = (
-            db.query(Test)
-            .filter(
+        duplicate_id = db.scalar(
+            select(Test.id).where(
                 func.lower(Test.name) == update_data["name"].lower(),
                 Test.id != test_id,
                 Test.status != -1,
             )
-            .first()
         )
-        if duplicate is not None:
+        if duplicate_id is not None:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Test name is already taken.")
 
     for field, value in update_data.items():
@@ -158,7 +156,7 @@ def add_test_parameter(
             status_code=status.HTTP_400_BAD_REQUEST, detail="Parameter is already linked to this test."
         )
 
-    max_position = db.query(func.max(TestParameter.position)).filter(TestParameter.test_id == test_id).scalar()
+    max_position = db.scalar(select(func.max(TestParameter.position)).where(TestParameter.test_id == test_id))
     next_position = 0 if max_position is None else max_position + 1
 
     link = TestParameter(test_id=test_id, parameter_id=payload.parameter_id, position=next_position)
@@ -200,7 +198,7 @@ def reorder_test_parameters(
     if test is None or test.status == -1:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Test not found.")
 
-    current_links = db.query(TestParameter).filter(TestParameter.test_id == test_id).all()
+    current_links = list(db.scalars(select(TestParameter).where(TestParameter.test_id == test_id)))
     current_ids = {link.parameter_id for link in current_links}
 
     if set(payload.ordered_ids) != current_ids or len(payload.ordered_ids) != len(current_links):

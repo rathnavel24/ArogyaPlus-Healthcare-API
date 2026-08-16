@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
@@ -15,12 +16,12 @@ admin_router = APIRouter(prefix="/api/admin/banners", tags=["admin-banners"])
 
 @public_router.get("", response_model=list[BannerOut])
 def list_banners(db: Session = Depends(get_db)):
-    return (
-        db.query(Banner)
-        .filter(Banner.is_active.is_(True), Banner.status != -1)
+    stmt = (
+        select(Banner)
+        .where(Banner.is_active.is_(True), Banner.status != -1)
         .order_by(Banner.display_order.asc(), Banner.id.asc())
-        .all()
     )
+    return db.scalars(stmt).all()
 
 
 @admin_router.get("", response_model=PaginatedResponse[BannerOut])
@@ -30,8 +31,8 @@ def admin_list_banners(
     db: Session = Depends(get_db),
     current_admin: Admin = Depends(get_current_admin),
 ):
-    query = db.query(Banner).filter(Banner.status != -1).order_by(Banner.display_order.asc(), Banner.id.asc())
-    return paginate_query(query, page, page_size)
+    stmt = select(Banner).where(Banner.status != -1).order_by(Banner.display_order.asc(), Banner.id.asc())
+    return paginate_query(db, stmt, page, page_size)
 
 
 @admin_router.post("", response_model=BannerOut, status_code=status.HTTP_201_CREATED)

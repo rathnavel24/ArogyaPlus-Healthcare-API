@@ -3,6 +3,7 @@ from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import ValidationError
+from sqlalchemy import case, func, select
 from sqlalchemy.orm import Session, joinedload
 
 from app.db.session import get_db
@@ -47,29 +48,31 @@ def admin_list_bookings(
     db: Session = Depends(get_db),
     current_admin: Admin = Depends(get_current_admin),
 ):
-    query = db.query(Booking)
+    stmt = select(Booking)
 
     if status_filter:
-        query = query.filter(Booking.status == status_filter)
+        stmt = stmt.where(Booking.status == status_filter)
     if booking_date:
-        query = query.filter(Booking.preferred_date == booking_date)
+        stmt = stmt.where(Booking.preferred_date == booking_date)
     if search:
         like = f"%{search}%"
-        query = query.filter(
+        stmt = stmt.where(
             (Booking.customer_name.ilike(like))
             | (Booking.phone.ilike(like))
             | (Booking.email.ilike(like))
             | (Booking.booking_reference.ilike(like))
         )
 
-    query = query.order_by(Booking.created_at.desc())
+    stmt = stmt.order_by(Booking.created_at.desc())
 
     # Counted before the joinedload is added — Booking.items is a collection, and
     # counting a joined collection would count booking+item combinations, not bookings.
-    total_rows = query.count()
+    total_rows = db.scalar(select(func.count()).select_from(stmt.subquery())) or 0
     total_pages, offset, limit = get_pagination(total_rows, page, page_size)
 
-    items = query.options(joinedload(Booking.items)).offset(offset).limit(limit).all()
+    items = db.scalars(
+        stmt.options(joinedload(Booking.items)).offset(offset).limit(limit)
+    ).unique().all()
     current_page = 1 if total_pages == 0 else min(max(page, 1), total_pages)
 
     return {
@@ -110,15 +113,28 @@ def update_booking_status(
 
 @dashboard_router.get("/stats")
 def get_dashboard_stats(db: Session = Depends(get_db), current_admin: Admin = Depends(get_current_admin)):
-    total_packages = db.query(Package).count()
-    total_tests = db.query(Test).count()
-    total_bookings = db.query(Booking).count()
-    new_bookings = db.query(Booking).filter(Booking.status == "New").count()
-    contacted_bookings = db.query(Booking).filter(Booking.status == "Contacted").count()
-    done_bookings = db.query(Booking).filter(Booking.status == "Done").count()
+    total_packages = db.scalar(select(func.count()).select_from(Package)) or 0
+    total_tests = db.scalar(select(func.count()).select_from(Test)) or 0
+
+    total_bookings, new_bookings, contacted_bookings, done_bookings = db.execute(
+        select(
+            func.count(Booking.id),
+            func.sum(case((Booking.status == "New", 1), else_=0)),
+            func.sum(case((Booking.status == "Contacted", 1), else_=0)),
+            func.sum(case((Booking.status == "Done", 1), else_=0)),
+        )
+    ).one()
+    total_bookings = total_bookings or 0
+    new_bookings = new_bookings or 0
+    contacted_bookings = contacted_bookings or 0
+    done_bookings = done_bookings or 0
 
     recent_bookings = (
-        db.query(Booking).options(joinedload(Booking.items)).order_by(Booking.created_at.desc()).limit(5).all()
+        db.scalars(
+            select(Booking).options(joinedload(Booking.items)).order_by(Booking.created_at.desc()).limit(5)
+        )
+        .unique()
+        .all()
     )
 
     return {
