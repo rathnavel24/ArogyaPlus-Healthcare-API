@@ -259,6 +259,7 @@ There is no public/customer-facing parameters endpoint — these are only ever v
 | GET 📄 | `/admin/bookings` | Yes | Query: `search` (name/phone/email/reference), `status_filter` (`New`\|`Contacted`\|`Done`), `booking_date`, `page`, `page_size`. |
 | GET | `/admin/bookings/{id}` | Yes | |
 | PATCH | `/admin/bookings/{id}/status` | Yes | Body `{ "status": "Contacted" }`. |
+| PATCH | `/admin/bookings/{id}/reschedule` | Yes | Body `{ "preferred_date": "...", "time_slot": "..." }`. Same validation as `POST /bookings`. Returns the full updated `Booking`. |
 | GET | `/admin/dashboard/stats` | Yes | Counts + `recent_bookings` (last 5, full `Booking` shape incl. `address`). |
 
 **POST body:**

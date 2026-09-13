@@ -12,7 +12,7 @@ from app.models.admin import Admin
 from app.models.booking import Booking
 from app.models.package import Package
 from app.models.test import Test
-from app.schemas.booking import BookingCreate, BookingCreatedOut, BookingOut, BookingStatusUpdate
+from app.schemas.booking import BookingCreate, BookingCreatedOut, BookingOut, BookingReschedule, BookingStatusUpdate
 from app.schemas.pagination import PaginatedResponse
 from app.services.booking_service import create_booking
 from app.utils import get_pagination
@@ -106,6 +106,24 @@ def update_booking_status(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Booking not found.")
 
     booking.status = payload.status
+    db.commit()
+    db.refresh(booking)
+    return booking
+
+
+@admin_router.patch("/{booking_id}/reschedule", response_model=BookingOut)
+def reschedule_booking(
+    booking_id: int,
+    payload: BookingReschedule,
+    db: Session = Depends(get_db),
+    current_admin: Admin = Depends(get_current_admin),
+):
+    booking = db.get(Booking, booking_id)
+    if booking is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Booking not found.")
+
+    booking.preferred_date = payload.preferred_date
+    booking.time_slot = payload.time_slot
     db.commit()
     db.refresh(booking)
     return booking

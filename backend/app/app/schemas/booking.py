@@ -14,6 +14,18 @@ NAME_PATTERN = re.compile(r"^[A-Za-z\s.'-]+$")
 PHONE_PATTERN = re.compile(r"^\+?\d{7,15}$")
 
 
+def _check_time_slot(value: str) -> str:
+    if value not in TIME_SLOTS:
+        raise ValueError("Invalid time slot selected.")
+    return value
+
+
+def _check_date_not_in_past(value: date) -> date:
+    if value < date.today():
+        raise ValueError("Preferred date cannot be in the past.")
+    return value
+
+
 class BookingItemIn(BaseModel):
     item_type: Literal["package", "test"]
     item_id: int
@@ -62,20 +74,31 @@ class BookingCreate(BaseModel):
     @field_validator("time_slot")
     @classmethod
     def valid_time_slot(cls, value: str) -> str:
-        if value not in TIME_SLOTS:
-            raise ValueError("Invalid time slot selected.")
-        return value
+        return _check_time_slot(value)
 
     @field_validator("preferred_date")
     @classmethod
     def date_not_in_past(cls, value: date) -> date:
-        if value < date.today():
-            raise ValueError("Preferred date cannot be in the past.")
-        return value
+        return _check_date_not_in_past(value)
 
 
 class BookingStatusUpdate(BaseModel):
     status: Literal["New", "Contacted", "Done"]
+
+
+class BookingReschedule(BaseModel):
+    preferred_date: date
+    time_slot: str
+
+    @field_validator("time_slot")
+    @classmethod
+    def valid_time_slot(cls, value: str) -> str:
+        return _check_time_slot(value)
+
+    @field_validator("preferred_date")
+    @classmethod
+    def date_not_in_past(cls, value: date) -> date:
+        return _check_date_not_in_past(value)
 
 
 class BookingOut(BaseModel):
